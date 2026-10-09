@@ -12,7 +12,10 @@
   <body>
     <header>
       <h1>LAN Pinger</h1>
-      <button id="scan" class="primary">Scan network</button>
+      <div class="header-buttons">
+        <button id="sound" class="ghost" aria-pressed="false">🔇 Sound off</button>
+        <button id="scan" class="primary">Scan network</button>
+      </div>
     </header>
     <div id="scan-status" class="muted"></div>
 
@@ -20,6 +23,7 @@
       <section id="list-view">
         <ul id="devices"></ul>
         <p id="empty" class="muted">No devices yet. Press <b>Scan network</b>.</p>
+        <p id="list-help" class="muted" hidden>Press <b>Find</b> on a device to open its arrow. <b>Ping</b> checks it once a second.</p>
       </section>
 
       <section id="locate-view" hidden>
@@ -41,15 +45,20 @@
         </div>
 
         <div class="direction">
-          <h2>Direction</h2>
+          <h2>Show the arrow where it is</h2>
+          <p class="muted">
+            Wi-Fi can tell the app a device is online, but not where it is in the room. So you show it once: point the
+            top of your phone at the device and tap the save button. After that the arrow keeps pointing there as you
+            turn around.
+          </p>
           <p class="muted" id="compass-status"></p>
           <div class="buttons">
-            <button id="compass">Enable compass</button>
-            <button id="mark">Point phone at device &amp; tap to save</button>
-            <button id="clear" class="ghost">Clear direction</button>
+            <button id="compass">1. Turn on compass</button>
+            <button id="mark">2. It's this way: save</button>
+            <button id="clear" class="ghost">Forget direction</button>
           </div>
           <label class="slider">
-            Bearing <span id="bearing-val" class="mono"></span>
+            No compass? Drag to set the direction by hand: <span id="bearing-val" class="mono"></span>
             <input id="bearing" type="range" min="0" max="359" step="1" />
           </label>
         </div>

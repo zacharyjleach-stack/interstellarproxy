@@ -42,6 +42,7 @@ events.addEventListener('ping', (e) => {
   if (h.length > 60) h.shift()
   state.history.set(p.ip, h)
   updateRow(p.ip)
+  if (p.ok) beep()
   if (p.ip === state.selected) {
     arrow?.pulse(p.ok)
     renderPingStat()
@@ -64,18 +65,34 @@ function renderList() {
           <div class="sub mono"></div>
         </div>
         <span class="lat mono"></span>
-        <button class="ping"></button>`
+        <button class="ping"></button>
+        <button class="find primary">Find</button>`
       li.querySelector('.title').textContent = label(d) + (d.self ? ' (this computer)' : '')
-      li.querySelector('.sub').textContent = [label(d) !== d.ip ? d.ip : null, d.mac, d.offline ? 'not seen in last scan' : null].filter(Boolean).join(' · ')
-      li.querySelector('.info').onclick = () => openLocate(d.ip)
+      li.querySelector('.sub').textContent = [
+        label(d) !== d.ip ? d.ip : null,
+        d.mac,
+        d.offline ? 'not seen in last scan' : null,
+        d.quiet ? 'ignores ping' : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      li.onclick = () => openLocate(d.ip)
+      li.querySelector('.find').onclick = (e) => {
+        e.stopPropagation()
+        openLocate(d.ip)
+      }
       const btn = li.querySelector('.ping')
       btn.textContent = d.pinging ? 'Stop' : 'Ping'
-      btn.className = d.pinging ? 'stop' : ''
-      btn.onclick = () => togglePing(d)
+      btn.className = d.pinging ? 'ping stop' : 'ping'
+      btn.onclick = (e) => {
+        e.stopPropagation()
+        togglePing(d)
+      }
       return li
     }),
   )
   $('empty').hidden = state.devices.length > 0
+  $('list-help').hidden = state.devices.length === 0
   state.devices.forEach((d) => updateRow(d.ip))
 }
 
@@ -86,18 +103,30 @@ function updateRow(ip) {
   const p = state.last.get(ip)
   const ms = p ? p.ms : d?.ms
   const ok = p ? p.ok : d && !d.offline
-  li.querySelector('.dot').className = 'dot ' + (p || d?.ms != null ? (ok ? 'ok' : 'bad') : '')
-  li.querySelector('.lat').textContent = ok && ms != null ? `${ms.toFixed(ms < 10 ? 1 : 0)} ms` : p ? 'timeout' : ''
+  li.querySelector('.dot').className = 'dot ' + (p ? (ok ? 'ok' : 'bad') : ok ? 'ok' : '')
+  li.querySelector('.lat').textContent = ok ? fmtMs(ms) : p ? 'no reply' : ''
 }
 
-const togglePing = (d) => api(`/api/devices/${d.ip}/ping`, d.pinging ? 'DELETE' : 'POST')
+const fmtMs = (ms) => (ms == null ? 'online' : `${ms.toFixed(ms < 10 ? 1 : 0)} ms`)
+
+const togglePing = (d) => {
+  unlockSound()
+  return api(`/api/devices/${d.ip}/ping`, d.pinging ? 'DELETE' : 'POST')
+}
 
 // ---- Locate view ----
 function openLocate(ip) {
   state.selected = ip
   $('list-view').hidden = true
   $('locate-view').hidden = false
-  arrow ||= createArrow($('arrow'))
+  if (!arrow) {
+    try {
+      arrow = createArrow($('arrow'))
+    } catch {
+      $('arrow-wrap').innerHTML = '<p id="arrow-error" class="muted">This browser can\'t show 3D graphics (WebGL is off). Ping and directions still work.</p>'
+      arrow = { setAngle() {}, pulse() {} }
+    }
+  }
   $('name').value = device()?.name || ''
   renderLocate()
   renderPingStat()
@@ -134,10 +163,10 @@ function updateArrow() {
   $('mark').disabled = state.heading === null
   if (b === null) {
     arrow.setAngle(null)
-    hint.textContent = 'No direction saved yet. Point your phone at the device and tap the button below, or use the slider.'
+    hint.textContent = 'Not set up yet. Use the steps below to show the arrow where this device is.'
   } else if (state.heading === null) {
     arrow.setAngle(b)
-    hint.textContent = 'No compass: the top of the screen is treated as north.'
+    hint.textContent = 'No compass on this device, so the arrow won\'t turn as you move.'
   } else {
     arrow.setAngle(b - state.heading)
     const off = Math.round(((b - state.heading + 540) % 360) - 180)
@@ -165,7 +194,7 @@ function renderPingStat() {
   const h = state.history.get(state.selected) || []
   const p = h[h.length - 1]
   const lost = h.filter((x) => !x.ok).length
-  $('ping-stat').textContent = !p ? '–' : p.ok ? `${p.ms.toFixed(1)} ms` : 'timeout'
+  $('ping-stat').textContent = !p ? '–' : p.ok ? fmtMs(p.ms) + (p.via === 'tcp' ? ' (TCP)' : '') : 'no reply'
   if (h.length) $('ping-stat').title = `${h.length} pings, ${lost} lost`
   drawSpark(h)
 }
@@ -177,11 +206,11 @@ function drawSpark(h) {
   const ctx = c.getContext('2d')
   ctx.clearRect(0, 0, w, ht)
   if (!h.length) return
-  const max = Math.max(5, ...h.filter((x) => x.ok).map((x) => x.ms))
+  const max = Math.max(5, ...h.filter((x) => x.ok && x.ms != null).map((x) => x.ms))
   const step = w / 59
   h.forEach((x, i) => {
     const px = w - (h.length - 1 - i) * step
-    const barH = x.ok ? Math.max(2, (x.ms / max) * ht) : ht
+    const barH = x.ok ? Math.max(2, ((x.ms ?? max / 2) / max) * ht) : ht
     ctx.fillStyle = x.ok ? '#3fb950' : '#f85149'
     ctx.fillRect(px - step * 0.35, ht - barH, step * 0.7, barH)
   })
@@ -221,4 +250,49 @@ async function enableCompass() {
 }
 
 $('compass').onclick = enableCompass
-setCompassStatus('Turn on the compass so the arrow follows you as you turn.')
+setCompassStatus('')
+
+// ---- Sound: a short sonar "ping" on every reply ----
+let audio = null
+let soundOn = false
+try {
+  soundOn = localStorage.getItem('sound') === 'on'
+} catch {}
+
+function unlockSound() {
+  // Browsers only allow audio after a tap, so create it on the first button press.
+  if (soundOn && !audio) audio = new (window.AudioContext || window.webkitAudioContext)()
+  audio?.resume()
+}
+
+function beep() {
+  if (!soundOn || !audio) return
+  const t = audio.currentTime
+  const osc = audio.createOscillator()
+  const gain = audio.createGain()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(1400, t)
+  osc.frequency.exponentialRampToValueAtTime(900, t + 0.35)
+  gain.gain.setValueAtTime(0.0001, t)
+  gain.gain.exponentialRampToValueAtTime(0.4, t + 0.01)
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5)
+  osc.connect(gain).connect(audio.destination)
+  osc.start(t)
+  osc.stop(t + 0.5)
+}
+
+function renderSound() {
+  $('sound').textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off'
+  $('sound').setAttribute('aria-pressed', String(soundOn))
+}
+
+$('sound').onclick = () => {
+  soundOn = !soundOn
+  try {
+    localStorage.setItem('sound', soundOn ? 'on' : 'off')
+  } catch {}
+  unlockSound()
+  if (soundOn) beep()
+  renderSound()
+}
+renderSound()

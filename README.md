@@ -18,10 +18,11 @@ Use `npm start` for plain HTTP if you only use it on the computer itself. Phones
 ## Using it
 
 - **Scan network** pings every address on your local network (up to 254) and lists the devices that answer, with their MAC address and hostname when available.
-- **Ping / Stop** starts or stops a once-a-second ping to a device. Latency and dropped pings show live.
-- Tap a device to open the **arrow** view:
-  1. Tap **Enable compass**.
-  2. Stand where you'll use it, point the top of your phone at the device, and tap **Point phone at device & tap to save**.
+- **Ping / Stop** starts or stops a once-a-second check on a device. Reply times and missed replies show live. Devices that block pings (iPhones, Windows PCs) are checked over TCP instead.
+- **Sound** plays a sonar ping on your screen for each reply. It can't make the other device make a noise.
+- Press **Find** on a device to open the **arrow** view:
+  1. Tap **Turn on compass**.
+  2. Point the top of your phone at the device and tap **It's this way: save**.
   3. From then on the arrow keeps pointing at the device as you turn around.
   
   On a computer with no compass, set the direction with the slider instead (screen-up counts as north).

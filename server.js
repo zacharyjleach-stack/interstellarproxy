@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import { ping, scan, localNetworks } from './lib/net.js'
+import { probe, scan, localNetworks } from './lib/net.js'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -49,7 +49,7 @@ function startPing(ip) {
     let seq = 0
     while (!state.stopped) {
       const t = Date.now()
-      const res = await ping(ip, 1000)
+      const res = await probe(ip, 1000)
       if (state.stopped) break
       broadcast('ping', { ip, seq: seq++, ...res, t })
       await new Promise((r) => setTimeout(r, Math.max(0, 1000 - (Date.now() - t))))
