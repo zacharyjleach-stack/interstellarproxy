@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import dgram from 'node:dgram'
 import { probe, scan, localNetworks } from './lib/net.js'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -12,6 +13,8 @@ const dataDir = path.join(root, 'data')
 const devicesFile = path.join(dataDir, 'devices.json')
 const PORT = Number(process.env.PORT) || 3000
 const useHttps = process.argv.includes('--https') || process.env.HTTPS === '1'
+const scheme = useHttps ? 'https' : 'http'
+const DISCOVERY_PORT = 41234
 
 // Saved per-device info (name, bearing), keyed by IP.
 let saved = {}
@@ -253,9 +256,26 @@ async function certificate() {
   return cert
 }
 
+// Let helpers find this master on the LAN without anyone typing an IP.
+// A helper broadcasts "lanpinger?"; we reply with our address.
+const toInt = (ip) => ip.split('.').reduce((n, o) => (n << 8) + Number(o), 0) >>> 0
+function urlForAsker(askerIp) {
+  const nets = localNetworks()
+  if (askerIp === '127.0.0.1' || !nets.length) return `${scheme}://localhost:${PORT}`
+  const same = nets.find((n) => (toInt(n.address) & toInt(n.netmask)) === (toInt(askerIp) & toInt(n.netmask)))
+  return `${scheme}://${(same || nets[0]).address}:${PORT}`
+}
+const disco = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+disco.on('message', (msg, rinfo) => {
+  if (msg.toString().trim() !== 'lanpinger?') return
+  const reply = Buffer.from(JSON.stringify({ lanpinger: true, url: urlForAsker(rinfo.address) }))
+  disco.send(reply, rinfo.port, rinfo.address)
+})
+disco.on('error', () => {})
+disco.bind(DISCOVERY_PORT)
+
 const server = useHttps ? https.createServer(await certificate(), handler) : http.createServer(handler)
 server.listen(PORT, () => {
-  const scheme = useHttps ? 'https' : 'http'
   console.log(`LAN Pinger running:`)
   console.log(`  ${scheme}://localhost:${PORT}`)
   for (const n of localNetworks()) console.log(`  ${scheme}://${n.address}:${PORT}   (${n.iface})`)

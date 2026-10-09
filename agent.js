@@ -8,17 +8,59 @@
 // It never shares a location (laptops have no GPS) and only ever talks to the
 // one server address you give it. Leave it running; press Ctrl+C to stop.
 
+import dgram from 'node:dgram'
 import http from 'node:http'
 import https from 'node:https'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
 
-const base = process.argv[2]
+const DISCOVERY_PORT = 41234
 const name = process.argv[3] || os.hostname()
+
+// Find the master on the LAN by broadcasting a question and waiting for its reply.
+function discover(timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+    const timer = setTimeout(() => {
+      sock.close()
+      reject(new Error('No master found on this Wi-Fi. Is the app running on your main laptop?'))
+    }, timeoutMs)
+    sock.on('message', (msg) => {
+      try {
+        const d = JSON.parse(msg)
+        if (d.lanpinger && d.url) {
+          clearTimeout(timer)
+          sock.close()
+          resolve(d.url)
+        }
+      } catch {}
+    })
+    sock.on('error', (e) => {
+      clearTimeout(timer)
+      reject(e)
+    })
+    sock.bind(() => {
+      sock.setBroadcast(true)
+      const ask = () => {
+        sock.send('lanpinger?', DISCOVERY_PORT, '255.255.255.255')
+        sock.send('lanpinger?', DISCOVERY_PORT, '127.0.0.1')
+      }
+      ask()
+      setInterval(ask, 1500).unref?.()
+    })
+  })
+}
+
+let base = process.argv[2]
 if (!base) {
-  console.error('Usage: node agent.js <server-address> [name]')
-  console.error('Example: node agent.js https://192.168.1.20:3000 "My laptop"')
-  process.exit(1)
+  console.log('Looking for your main laptop on this Wi-Fi...')
+  try {
+    base = await discover()
+    console.log('Found it:', base)
+  } catch (e) {
+    console.error(e.message)
+    process.exit(1)
+  }
 }
 
 const url = new URL(base)
