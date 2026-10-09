@@ -36,11 +36,13 @@ Laptops have no GPS, so the arrow can't point to one. But you can make it ring
 loudly to find which room it's in. Run this once on that computer (it needs
 Node.js too):
 
+**Easy way:** clone this project on that computer too, then double-click **`helper.cmd`** (Windows) or **`helper.sh`** (Mac/Linux). The first time, it asks for your main laptop's app address (the `https://…` the app prints) and remembers it. After that, just double-click it whenever you want the computer findable. Leave the little window open; close it to stop.
+
+**Or run it directly:**
+
 ```sh
 node agent.js https://192.168.1.20:3000 "My laptop"
-```
-
-Use the `https://…` address the app printed. Leave that window open. The
+``` The
 computer now shows up in the app marked 📡 findable; press **Find**, then
 **🔔 Ring it**, and it plays an alarm until you press **I found it**. The helper
 only talks to that one address and never shares a location.
