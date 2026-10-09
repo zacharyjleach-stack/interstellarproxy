@@ -30,6 +30,21 @@ Use `npm start` for plain HTTP if you only use it on the computer itself. Phones
 
 iPhones stop web pages when the screen locks, so a locked iPhone can't be rung this way.
 
+### Ring your own laptop or PC to find it by ear
+
+Laptops have no GPS, so the arrow can't point to one. But you can make it ring
+loudly to find which room it's in. Run this once on that computer (it needs
+Node.js too):
+
+```sh
+node agent.js https://192.168.1.20:3000 "My laptop"
+```
+
+Use the `https://…` address the app printed. Leave that window open. The
+computer now shows up in the app marked 📡 findable; press **Find**, then
+**🔔 Ring it**, and it plays an alarm until you press **I found it**. The helper
+only talks to that one address and never shares a location.
+
 ### Other devices (TVs, printers, smart plugs)
 
 These can't run the app, so the arrow can't find them by itself. Press **Find** and show it the direction once:
