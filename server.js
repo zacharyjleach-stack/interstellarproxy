@@ -26,11 +26,45 @@ async function persist() {
   await fs.writeFile(devicesFile, JSON.stringify(saved, null, 2))
 }
 
+// "Findable" devices: phones/computers that opened this app and report their own location.
+const beacons = new Map() // ip -> { name, lat, lon, acc, t }
+const ringing = new Set()
+const BEACON_TTL = 20000
+const clientIp = (req) => (req.socket.remoteAddress || '').replace(/^::ffff:/, '')
+const liveBeacon = (ip) => {
+  const b = beacons.get(ip)
+  return b && Date.now() - b.t < BEACON_TTL ? b : null
+}
+
 const view = () => {
   const known = new Map(devices.map((d) => [d.ip, d]))
   for (const ip of Object.keys(saved)) if (!known.has(ip)) known.set(ip, { ip, offline: true })
-  return [...known.values()].map((d) => ({ ...d, ...saved[d.ip], pinging: pingers.has(d.ip) }))
+  for (const ip of beacons.keys()) if (liveBeacon(ip)) known.set(ip, { ...known.get(ip), ip, offline: false })
+  return [...known.values()].map((d) => {
+    const beacon = liveBeacon(d.ip)
+    return {
+      ...d,
+      ...(beacon ? { hostname: d.hostname || beacon.name } : {}),
+      ...saved[d.ip],
+      pinging: pingers.has(d.ip),
+      beacon,
+      ringing: ringing.has(d.ip),
+    }
+  })
 }
+
+// Forget findable devices whose page was closed.
+setInterval(() => {
+  let changed = false
+  for (const ip of beacons.keys()) {
+    if (!liveBeacon(ip)) {
+      beacons.delete(ip)
+      ringing.delete(ip)
+      changed = true
+    }
+  }
+  if (changed) broadcast('devices', view())
+}, 5000)
 
 // Server-sent events to every open browser tab.
 const clients = new Set()
@@ -123,7 +157,7 @@ const isIp = (s) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s)
 async function handler(req, res) {
   const url = new URL(req.url, 'http://x')
   const p = url.pathname
-  const m = p.match(/^\/api\/devices\/([\d.]+)(\/ping)?$/)
+  const m = p.match(/^\/api\/devices\/([\d.]+)(\/ping|\/ring)?$/)
 
   if (p === '/api/events') {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
@@ -135,17 +169,47 @@ async function handler(req, res) {
   }
   if (p === '/api/devices' && req.method === 'GET') return json(res, 200, view())
   if (p === '/api/networks') return json(res, 200, localNetworks())
+  if (p === '/api/beacon' && req.method === 'POST') {
+    const ip = clientIp(req)
+    const body = await readBody(req)
+    const num = (v) => (Number.isFinite(v) ? v : null)
+    const prev = beacons.get(ip)
+    beacons.set(ip, {
+      name: typeof body.name === 'string' ? body.name.slice(0, 60) : prev?.name || null,
+      lat: num(body.lat),
+      lon: num(body.lon),
+      acc: num(body.acc),
+      t: Date.now(),
+    })
+    broadcast('devices', view())
+    return json(res, 200, { ip, ringing: ringing.has(ip) })
+  }
+  if (p === '/api/beacon' && req.method === 'DELETE') {
+    const ip = clientIp(req)
+    beacons.delete(ip)
+    ringing.delete(ip)
+    broadcast('devices', view())
+    return json(res, 200, { ok: true })
+  }
   if (p === '/api/scan' && req.method === 'POST') {
     runScan()
     return json(res, 202, { started: true })
   }
   if (m && isIp(m[1])) {
     const ip = m[1]
-    if (m[2] && req.method === 'POST') {
+    if (m[2] === '/ring' && req.method === 'POST') {
+      const { on } = await readBody(req)
+      if (on) ringing.add(ip)
+      else ringing.delete(ip)
+      broadcast('ring', { ip, on: Boolean(on) })
+      broadcast('devices', view())
+      return json(res, 200, { ringing: Boolean(on) })
+    }
+    if (m[2] === '/ping' && req.method === 'POST') {
       startPing(ip)
       return json(res, 200, { pinging: true })
     }
-    if (m[2] && req.method === 'DELETE') {
+    if (m[2] === '/ping' && req.method === 'DELETE') {
       stopPing(ip)
       return json(res, 200, { pinging: false })
     }

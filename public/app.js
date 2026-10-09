@@ -1,4 +1,5 @@
 import { createArrow } from './arrow.js'
+import { createBeacon, distanceM, bearingDeg, fmtDistance } from './findable.js'
 
 const $ = (id) => document.getElementById(id)
 const state = {
@@ -8,7 +9,10 @@ const state = {
   selected: null,
   heading: null, // compass heading in degrees, null if unavailable
   draftBearing: null, // slider value while dragging
+  myPos: null, // this phone's GPS position, while finding a 📡 device
 }
+let geoWatch = null
+const myPings = new Set() // pings started from this screen; only these beep here
 let arrow = null
 
 const api = (path, method = 'GET', body) =>
@@ -42,14 +46,31 @@ events.addEventListener('ping', (e) => {
   if (h.length > 60) h.shift()
   state.history.set(p.ip, h)
   updateRow(p.ip)
-  if (p.ok) beep()
+  if (p.ok && myPings.has(p.ip)) beep()
   if (p.ip === state.selected) {
     arrow?.pulse(p.ok)
     renderPingStat()
   }
 })
 
+events.addEventListener('ring', (e) => beacon.onRing(JSON.parse(e.data)))
+
 $('scan').onclick = () => api('/api/scan', 'POST')
+
+// ---- Findable mode (this device is the one being found) ----
+const beacon = createBeacon({
+  $,
+  api,
+  onExit: () => {
+    $('beacon-view').hidden = true
+    $('list-view').hidden = false
+  },
+})
+$('become-beacon').onclick = () => {
+  $('list-view').hidden = true
+  $('beacon-view').hidden = false
+  beacon.start()
+}
 
 // ---- Device list ----
 function renderList() {
@@ -68,6 +89,7 @@ function renderList() {
         <button class="ping"></button>
         <button class="find primary">Find</button>`
       li.querySelector('.title').textContent = label(d) + (d.self ? ' (this computer)' : '')
+      if (d.beacon) li.querySelector('.title').insertAdjacentHTML('beforeend', '<span class="badge">📡 findable</span>')
       li.querySelector('.sub').textContent = [
         label(d) !== d.ip ? d.ip : null,
         d.mac,
@@ -111,6 +133,8 @@ const fmtMs = (ms) => (ms == null ? 'online' : `${ms.toFixed(ms < 10 ? 1 : 0)} m
 
 const togglePing = (d) => {
   unlockSound()
+  if (d.pinging) myPings.delete(d.ip)
+  else myPings.add(d.ip)
   return api(`/api/devices/${d.ip}/ping`, d.pinging ? 'DELETE' : 'POST')
 }
 
@@ -128,6 +152,7 @@ function openLocate(ip) {
     }
   }
   $('name').value = device()?.name || ''
+  $('app-url').textContent = location.origin
   renderLocate()
   renderPingStat()
   window.scrollTo(0, 0)
@@ -135,6 +160,7 @@ function openLocate(ip) {
 
 $('back').onclick = () => {
   state.selected = null
+  stopMyPosition()
   $('locate-view').hidden = true
   $('list-view').hidden = false
 }
@@ -147,7 +173,64 @@ function renderLocate() {
   $('ping-toggle').textContent = d.pinging ? 'Stop ping' : 'Start ping'
   $('ping-toggle').className = d.pinging ? 'stop' : 'primary'
   if (state.draftBearing === null) $('bearing').value = d.bearing ?? 0
+
+  const findable = Boolean(d.beacon)
+  const hasLocation = d.beacon?.lat != null
+  $('ring').hidden = !findable
+  $('ring').textContent = d.ringing ? '🔕 Stop ringing' : '🔔 Ring it'
+  $('ring').classList.toggle('on', Boolean(d.ringing))
+  $('auto-panel').hidden = !findable
+  $('manual-panel').hidden = hasLocation
+  if (hasLocation) startMyPosition()
+  else stopMyPosition()
   updateArrow()
+}
+
+$('ring').onclick = () => {
+  const d = device()
+  if (d) api(`/api/devices/${d.ip}/ring`, 'POST', { on: !d.ringing })
+}
+
+// This phone's own location, needed to point at a 📡 device's location.
+function startMyPosition() {
+  if (geoWatch !== null || !navigator.geolocation || !window.isSecureContext) return
+  geoWatch = navigator.geolocation.watchPosition(
+    (p) => {
+      state.myPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }
+      updateArrow()
+    },
+    () => {
+      state.myPos = null
+      updateArrow()
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+  )
+}
+
+function stopMyPosition() {
+  if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch)
+  geoWatch = null
+  state.myPos = null
+  $('distance').textContent = ''
+}
+
+// Where the 📡 device is relative to us, from both devices' locations. Null if not available.
+function autoTarget() {
+  const b = device()?.beacon
+  if (b?.lat == null || !state.myPos) return null
+  return {
+    bearing: bearingDeg(state.myPos, b),
+    distance: distanceM(state.myPos, b),
+    uncertainty: (b.acc || 0) + (state.myPos.acc || 0),
+  }
+}
+
+function autoStatus(d, target) {
+  if (!d.beacon) return ''
+  if (d.beacon.lat == null) return 'This device is findable but isn\'t sharing a location (it may have said no to location access). Use Ring it and follow the sound.'
+  if (!window.isSecureContext) return 'Your phone needs the https:// address to use its location. Restart the app with npm run start:https.'
+  if (!state.myPos) return 'Getting your location… Allow location access if your phone asks.'
+  return `Both devices share their location over Wi-Fi. Phone locations are only accurate to about ${Math.round(target.uncertainty)} m, so the arrow gets you close, then Ring it gets you the rest of the way.`
 }
 
 function bearing() {
@@ -156,17 +239,28 @@ function bearing() {
 
 function updateArrow() {
   if (!arrow || !state.selected) return
-  const b = bearing()
   const hint = $('arrow-hint')
+  const d = device()
+  const target = autoTarget()
+  $('auto-status').textContent = d ? autoStatus(d, target) : ''
+  $('distance').textContent = target ? `≈ ${fmtDistance(target.distance)}` : ''
+  if (target && target.distance <= target.uncertainty / 2) {
+    arrow.setAngle(null)
+    hint.textContent = 'You\'re very close. Tap Ring it and follow the sound.'
+    return
+  }
+  const b = target ? target.bearing : bearing()
   $('bearing-val').textContent = b === null ? 'not set' : `${Math.round(b)}°`
   $('clear').disabled = b === null
   $('mark').disabled = state.heading === null
   if (b === null) {
     arrow.setAngle(null)
-    hint.textContent = 'Not set up yet. Use the steps below to show the arrow where this device is.'
+    hint.textContent = d?.beacon
+      ? 'Waiting for locations…'
+      : 'Not set up yet. See "Find it automatically" below.'
   } else if (state.heading === null) {
     arrow.setAngle(b)
-    hint.textContent = 'No compass on this device, so the arrow won\'t turn as you move.'
+    hint.textContent = 'Turn on the compass so the arrow turns with you.'
   } else {
     arrow.setAngle(b - state.heading)
     const off = Math.round(((b - state.heading + 540) % 360) - 180)
@@ -282,7 +376,8 @@ function beep() {
 }
 
 function renderSound() {
-  $('sound').textContent = soundOn ? '🔊 Sound on' : '🔇 Sound off'
+  $('sound').textContent = soundOn ? '🔊' : '🔇'
+  $('sound').title = soundOn ? 'Sound on: beeps when a device you ping replies' : 'Sound off'
   $('sound').setAttribute('aria-pressed', String(soundOn))
 }
 

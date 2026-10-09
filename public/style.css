@@ -70,3 +70,28 @@ button.stop { background: var(--bad); border-color: var(--bad); color: #fff; }
 .slider input { width: 100%; padding: 0; margin-top: 6px; }
 #arrow-error { padding: 24px; text-align: center; }
 @media (max-width: 420px) { #devices .lat { display: none; } }
+button.wide { width: 100%; margin: 8px 0; padding: 12px; }
+button.ring { background: #d29922; border-color: #d29922; color: #111; font-weight: 600; }
+button.ring.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+.field { display: block; margin: 12px 0; }
+.field input { display: block; width: 100%; margin-top: 6px; }
+#distance { position: absolute; top: 12px; left: 0; right: 0; text-align: center; font-size: 28px; font-weight: 700; }
+.badge { font-size: 12px; padding: 1px 6px; border-radius: 999px; background: #1f6feb33; color: #79c0ff; margin-left: 6px; }
+
+.beacon-card { text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px 16px; margin: 16px 0; }
+.radar { position: relative; width: 120px; height: 120px; margin: 0 auto 16px; }
+.radar::after { content: ''; position: absolute; inset: 50px; border-radius: 50%; background: var(--accent); }
+.radar span { position: absolute; inset: 0; border: 2px solid var(--accent); border-radius: 50%; opacity: 0; animation: radar 2.4s ease-out infinite; }
+.radar span:nth-child(2) { animation-delay: 0.8s; }
+.radar span:nth-child(3) { animation-delay: 1.6s; }
+@keyframes radar { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+
+#alarm { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; animation: flash 0.7s steps(1) infinite; }
+#alarm[hidden] { display: none; }
+.alarm-inner { text-align: center; color: #fff; }
+.alarm-icon { font-size: 96px; animation: shake 0.3s infinite; }
+#alarm h1 { font-size: 40px; margin: 8px 0 24px; }
+#alarm button { font-size: 22px; padding: 16px 32px; }
+@keyframes flash { 0% { background: #f85149; } 50% { background: #ffffff; } }
+@keyframes shake { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@media (prefers-reduced-motion: reduce) { #alarm, .alarm-icon, .radar span { animation: none; } #alarm { background: #f85149; } }

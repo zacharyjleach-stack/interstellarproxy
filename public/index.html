@@ -13,7 +13,7 @@
     <header>
       <h1>LAN Pinger</h1>
       <div class="header-buttons">
-        <button id="sound" class="ghost" aria-pressed="false">🔇 Sound off</button>
+        <button id="sound" class="ghost" aria-pressed="false" aria-label="Sound">🔇</button>
         <button id="scan" class="primary">Scan network</button>
       </div>
     </header>
@@ -21,9 +21,23 @@
 
     <main>
       <section id="list-view">
+        <button id="become-beacon" class="wide">📡 Make this device findable</button>
         <ul id="devices"></ul>
         <p id="empty" class="muted">No devices yet. Press <b>Scan network</b>.</p>
-        <p id="list-help" class="muted" hidden>Press <b>Find</b> on a device to open its arrow. <b>Ping</b> checks it once a second.</p>
+        <p id="list-help" class="muted" hidden>
+          Press <b>Find</b> on a device to open its arrow. <b>Ping</b> checks it once a second. Devices marked 📡 can be
+          found automatically and rung.
+        </p>
+      </section>
+
+      <section id="beacon-view" hidden>
+        <div class="beacon-card">
+          <div class="radar"><span></span><span></span><span></span></div>
+          <h2>This device is findable</h2>
+          <p id="beacon-status" class="muted"></p>
+          <label class="field">Show it as <input id="beacon-name" maxlength="60" /></label>
+          <button id="beacon-stop">Stop being findable</button>
+        </div>
       </section>
 
       <section id="locate-view" hidden>
@@ -35,26 +49,40 @@
 
         <div id="arrow-wrap">
           <canvas id="arrow"></canvas>
+          <div id="distance" class="mono"></div>
           <div id="arrow-hint"></div>
         </div>
 
         <div class="ping-row">
+          <button id="ring" class="ring" hidden>🔔 Ring it</button>
           <button id="ping-toggle" class="primary">Start ping</button>
           <span id="ping-stat" class="mono">–</span>
           <canvas id="spark" width="300" height="40"></canvas>
         </div>
 
         <div class="direction">
-          <h2>Show the arrow where it is</h2>
-          <p class="muted">
-            Wi-Fi can tell the app a device is online, but not where it is in the room. So you show it once: point the
-            top of your phone at the device and tap the save button. After that the arrow keeps pointing there as you
-            turn around.
-          </p>
           <p class="muted" id="compass-status"></p>
+          <button id="compass">🧭 Turn on compass</button>
+        </div>
+
+        <div id="auto-panel" class="direction" hidden>
+          <h2>📡 Finding it automatically</h2>
+          <p class="muted" id="auto-status"></p>
+        </div>
+
+        <div id="manual-panel" class="direction">
+          <h2>Find it automatically</h2>
+          <p class="muted">
+            If it's a phone, tablet or computer, open <b class="mono" id="app-url"></b> on it and tap
+            <b>📡 Make this device findable</b>. Then the arrow points to it by itself, and you can make it ring.
+          </p>
+          <h2>Or show the arrow yourself</h2>
+          <p class="muted">
+            For things like TVs and printers: turn on the compass, point the top of your phone at the device, and tap save.
+            The arrow then keeps pointing there as you turn.
+          </p>
           <div class="buttons">
-            <button id="compass">1. Turn on compass</button>
-            <button id="mark">2. It's this way: save</button>
+            <button id="mark">It's this way: save</button>
             <button id="clear" class="ghost">Forget direction</button>
           </div>
           <label class="slider">
@@ -64,6 +92,14 @@
         </div>
       </section>
     </main>
+
+    <div id="alarm" hidden>
+      <div class="alarm-inner">
+        <div class="alarm-icon">🔔</div>
+        <h1>Here I am!</h1>
+        <button id="found" class="primary">I found it</button>
+      </div>
+    </div>
 
     <script type="module" src="/app.js"></script>
   </body>
