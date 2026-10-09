@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>LAN Pinger</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <header>
+      <h1>LAN Pinger</h1>
+      <button id="scan" class="primary">Scan network</button>
+    </header>
+    <div id="scan-status" class="muted"></div>
+
+    <main>
+      <section id="list-view">
+        <ul id="devices"></ul>
+        <p id="empty" class="muted">No devices yet. Press <b>Scan network</b>.</p>
+      </section>
+
+      <section id="locate-view" hidden>
+        <div class="locate-head">
+          <button id="back" class="ghost">&larr; Devices</button>
+          <input id="name" placeholder="Name this device" maxlength="60" />
+          <span id="locate-ip" class="muted mono"></span>
+        </div>
+
+        <div id="arrow-wrap">
+          <canvas id="arrow"></canvas>
+          <div id="arrow-hint"></div>
+        </div>
+
+        <div class="ping-row">
+          <button id="ping-toggle" class="primary">Start ping</button>
+          <span id="ping-stat" class="mono">–</span>
+          <canvas id="spark" width="300" height="40"></canvas>
+        </div>
+
+        <div class="direction">
+          <h2>Direction</h2>
+          <p class="muted" id="compass-status"></p>
+          <div class="buttons">
+            <button id="compass">Enable compass</button>
+            <button id="mark">Point phone at device &amp; tap to save</button>
+            <button id="clear" class="ghost">Clear direction</button>
+          </div>
+          <label class="slider">
+            Bearing <span id="bearing-val" class="mono"></span>
+            <input id="bearing" type="range" min="0" max="359" step="1" />
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
