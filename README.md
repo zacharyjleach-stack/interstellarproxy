@@ -1,73 +1,68 @@
-<div align="center">
-    <h1>Interstellar Proxy</h1>
-</div>
+# LAN Pinger
 
-<p>Interstellar is a popular web proxy, serving over 7 million users since 2023.</p>
+Scan your home network, ping any device on it, and follow a 3D arrow on your phone to the one you pick.
 
-### Join Our [Discord Community](https://discord.gg/interstellar)
+## Run it
 
-**If you find this project useful, consider giving it a star in the original repository.**
+You need [Node.js](https://nodejs.org) 18 or newer, on a computer connected to the network you want to scan.
 
-<h2 align="center">Features</h2>
-<ul>
-    <li>About:Blank Cloaking</li>
-    <li>Fast Speeds</li>
-    <li>Wide Collection of Games</li>
-    <li>Tab Cloaking</li>
-    <li>Wide Collection of Apps</li>
-    <li>Built-In Tab System</li>
-    <li>Clean UI</li>
-    <li>Inspect Element</li>
-    <li>Now.GG Support</li>
-    <li>Built-in Password Protection</li>
-    <li>Geforce Now Support</li>
-</ul>
+```sh
+npm install
+npm run start:https
+```
 
-<h2 align="center">Deployment</h2>
+The terminal prints the addresses it's running on, for example `https://192.168.1.20:3000`. Open that address on your phone (same Wi-Fi). The certificate is self-signed, so your browser will warn you once; choose to continue.
 
-### Easy Deployment
+Use `npm start` for plain HTTP if you only use it on the computer itself. Phones only allow the compass over HTTPS.
 
-**Note:** You **cannot** deploy to static web hosts, including Netlify, Cloudflare Pages, and GitHub Pages.
+## Using it
 
-<a target="_blank" href="https://heroku.com/deploy/?template=https://github.com/interstellarnetwork/interstellar"><img alt="Deploy to Heroku" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/heroku.svg"></a>
-<a target="_blank" href="https://app.koyeb.com/deploy?type=git&repository=github.com/interstellarnetwork/interstellar"><img alt="Deploy to Koyeb" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/koyeb.svg"></a>
-<a target="_blank" href="https://app.cyclic.sh/api/app/deploy/interstellarnetwork/Interstellar"><img alt="Deploy to Cyclic" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/cyclic.svg"></a>
+- **Scan network** pings every address on your local network (up to 254) and lists the devices that answer, with their MAC address and hostname when available.
+- **Ping / Stop** starts or stops a once-a-second check on a device. Reply times and missed replies show live. Devices that block pings (iPhones, Windows PCs) are checked over TCP instead.
+- **🔇 / 🔊** turns on a sonar sound for each reply. It plays only on the screen where you pressed Ping.
 
-<h2 align="center">Deployment Alternatives</h2>
+### Finding a phone, tablet or computer automatically
 
-For more deployment options, join our [Discord Server](https://discord.gg/interstellar) for various ways to deploy Interstellar.
-This includes methods of deploying to Render/OnRender.
+1. On the device you want to find, open the app's address and tap **📡 Make this device findable**. Allow location access. Leave that page open with the screen on.
+2. On your phone, open the app and press **Find** on that device (it's marked 📡 findable).
+3. The arrow points to it and shows roughly how far away it is, using both devices' locations. Tap **🧭 Turn on compass** so the arrow turns with you.
+4. Phone locations are only accurate to a few metres (worse indoors), so when you're close, tap **🔔 Ring it**. The device sounds an alarm, vibrates and flashes until someone taps **I found it**.
 
-#### What happened to Replit Deployment?
+iPhones stop web pages when the screen locks, so a locked iPhone can't be rung this way.
 
-As of January 1st, 2024, Replit is [no longer free](https://blog.replit.com/hosting-changes). Try GitHub Codespaces instead.
+### Ring your own laptop or PC to find it by ear
 
-### GitHub Codespaces
+Laptops have no GPS, so the arrow can't point to one. But you can make it ring
+loudly to find which room it's in. Run this once on that computer (it needs
+Node.js too):
 
-1. Create a GitHub account if you haven't already.
-2. Click "Code" (green button) and then "Create Codespace on main."
-3. In the terminal at the bottom, paste `npm i && npm run start`.
-4. Respond to the application popup by clicking "Make public."
-   > Make sure you actually click the "Make public." button, or the proxy won't function properly.
-5. Access the deployed website from the ports tab.
-6. For subsequent uses in the same codespace, just run `npm run start`
+**Easy way:** clone this project on that computer too, then double-click **`helper.cmd`** (Windows) or **`helper.sh`** (Mac/Linux). The first time, it asks for your main laptop's app address (the `https://…` the app prints) and remembers it. After that, just double-click it whenever you want the computer findable. Leave the little window open; close it to stop.
 
-### Solution for if there is no popup.
+**Or run it directly:**
 
-1. Run `npm i`, and before `npm run start`, prepend `$env:PORT=8080;`, replacing 8080 with another port. For example, `$env:PORT=6969; npm run start`.
-2. Go to the ports tab, Click Forward A Port, And type the port number.
-3. Right-click Visibility and set Port Visibility to Public.
+```sh
+node agent.js https://192.168.1.20:3000 "My laptop"
+``` The
+computer now shows up in the app marked 📡 findable; press **Find**, then
+**🔔 Ring it**, and it plays an alarm until you press **I found it**. The helper
+only talks to that one address and never shares a location.
 
-<h2 align="center">Need Help with Deployment?</h2>
+### Other devices (TVs, printers, smart plugs)
 
-If you're having trouble, reach out to us on [Discord](https://discord.gg/interstellar) for personalized support.
+These can't run the app, so the arrow can't find them by itself. Press **Find** and show it the direction once:
+1. Tap **🧭 Turn on compass**.
+2. Point the top of your phone at the device and tap **It's this way: save**.
+3. From then on the arrow keeps pointing at the device as you turn around.
 
-### Report Issues
+On a computer with no compass, set the direction with the slider instead (screen-up counts as north).
 
-If you encounter problems, open an issue on GitHub, and we'll address it promptly.
+Names and directions are saved in `data/devices.json`.
 
-# Credits
+## Why some devices need help
 
-A huge thank you to all of the people who have contributed to Interstellar.
+Wi-Fi and ping can tell you a device is on your network, but not where it is. Ping time on a home network doesn't change with distance. So the app finds devices by asking them for their location (findable mode), or by remembering a direction you show it.
 
-[![Contributors](https://contrib.rocks/image?repo=InterstellarNetwork/Interstellar)](https://github.com/InterstellarNetwork/Interstellar/graphs/contributors)
+## Notes
+
+- Some devices don't answer pings. The scan still lists them if they show up on the network some other way.
+- Only scan networks you own or have permission to scan.
